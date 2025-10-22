@@ -17,6 +17,21 @@ function errorHandler(err, req, res, next) {
     });
   }
 
+  if (err.code === 'ER_PARSE_ERROR') {
+    return res.status(500).json({
+      error: 'Database Query Error',
+      message: 'Invalid database query'
+    });
+  }
+
+  // JSON parse errors
+  if (err.type === 'entity.parse.failed') {
+    return res.status(400).json({
+      error: 'Bad Request',
+      message: 'Invalid JSON in request body'
+    });
+  }
+
   // Use the status from the error if available, otherwise default to 500
   const status = err.status || err.statusCode || 500;
 

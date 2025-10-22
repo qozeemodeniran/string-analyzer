@@ -86,8 +86,9 @@ class StringAnalysis {
       values.push(filters.word_count);
     }
     
-    if (filters.contains_character !== undefined) {
-      query += ' AND JSON_CONTAINS_PATH(character_frequency_map, "one", ?)';
+    // FIXED: Character frequency filter - check if character exists in the frequency map
+    if (filters.contains_character !== undefined && filters.contains_character.length === 1) {
+      query += ' AND JSON_EXTRACT(character_frequency_map, ?) IS NOT NULL';
       values.push(`$.${filters.contains_character}`);
     }
     

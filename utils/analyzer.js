@@ -8,7 +8,7 @@ function analyzeString(inputString) {
   }
 
   // Basic validation
-  if (!inputString && inputString !== '') {
+  if (inputString === undefined || inputString === null) {
     const error = new Error('Invalid request body or missing "value" field');
     error.status = 400;
     throw error;
@@ -16,9 +16,10 @@ function analyzeString(inputString) {
 
   const length = inputString.length;
   
-  // Case-insensitive palindrome check
+  // Case-insensitive palindrome check (ignore non-alphanumeric characters)
   const cleanString = inputString.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
-  const is_palindrome = cleanString === cleanString.split('').reverse().join('') && cleanString.length > 0;
+  const is_palindrome = cleanString.length > 0 && 
+                       cleanString === cleanString.split('').reverse().join('');
   
   // Unique characters count
   const unique_characters = new Set(inputString).size;
@@ -50,7 +51,7 @@ function analyzeString(inputString) {
   };
 }
 
-// Natural language query parser
+// Enhanced Natural language query parser
 function parseNaturalLanguageQuery(query) {
   if (!query || typeof query !== 'string') {
     const error = new Error('Query parameter is required and must be a string');
@@ -58,7 +59,7 @@ function parseNaturalLanguageQuery(query) {
     throw error;
   }
 
-  const lowerQuery = query.toLowerCase();
+  const lowerQuery = query.toLowerCase().trim();
   const filters = {};
 
   // Parse palindrome-related queries
@@ -67,18 +68,18 @@ function parseNaturalLanguageQuery(query) {
   }
 
   // Parse length-related queries
-  const longerMatch = lowerQuery.match(/(?:longer than|greater than|more than|over)\s+(\d+)\s+(?:characters?|chars?)/);
+  const longerMatch = lowerQuery.match(/(?:longer than|greater than|more than|over)\s+(\d+)\s*(?:characters?|chars?)?/);
   if (longerMatch) {
     filters.min_length = parseInt(longerMatch[1]) + 1;
   }
 
-  const shorterMatch = lowerQuery.match(/(?:shorter than|less than|under)\s+(\d+)\s+(?:characters?|chars?)/);
+  const shorterMatch = lowerQuery.match(/(?:shorter than|less than|under)\s+(\d+)\s*(?:characters?|chars?)?/);
   if (shorterMatch) {
     filters.max_length = parseInt(shorterMatch[1]) - 1;
   }
 
-  const exactLengthMatch = lowerQuery.match(/(\d+)\s+(?:characters?|chars?)\s+(?:long|length)/);
-  if (exactLengthMatch) {
+  const exactLengthMatch = lowerQuery.match(/(\d+)\s*(?:characters?|chars?)\s*(?:long|length)?/);
+  if (exactLengthMatch && !longerMatch && !shorterMatch) {
     filters.min_length = parseInt(exactLengthMatch[1]);
     filters.max_length = parseInt(exactLengthMatch[1]);
   }
@@ -89,20 +90,38 @@ function parseNaturalLanguageQuery(query) {
     filters.word_count = 1;
   }
 
+  const twoWordsMatch = lowerQuery.match(/(?:two|2)\s+words?/);
+  if (twoWordsMatch) {
+    filters.word_count = 2;
+  }
+
   const multiWordMatch = lowerQuery.match(/(\d+)\s+words?/);
-  if (multiWordMatch) {
+  if (multiWordMatch && !singleWordMatch) {
     filters.word_count = parseInt(multiWordMatch[1]);
   }
 
   // Parse character containment queries
-  const charMatch = lowerQuery.match(/(?:containing|with|that have|having)\s+(?:the\s+)?(?:letter|character)\s+['"]?([a-zA-Z])['"]?/);
+  const charMatch = lowerQuery.match(/(?:containing|with|that have|having|contains?)\s+(?:the\s+)?(?:letter|character)\s+['"]?([a-zA-Z])['"]?/);
   if (charMatch) {
     filters.contains_character = charMatch[1].toLowerCase();
   }
 
+  const specificCharMatch = lowerQuery.match(/(?:containing|with|that have|having|contains?)\s+['"]?([a-zA-Z])['"]?/);
+  if (specificCharMatch && !charMatch) {
+    filters.contains_character = specificCharMatch[1].toLowerCase();
+  }
+
   const vowelMatch = lowerQuery.match(/(?:first\s+)?vowel/);
   if (vowelMatch) {
-    filters.contains_character = 'a'; // Default to first vowel 'a'
+    filters.contains_character = 'a';
+  }
+
+  // Handle "all" queries specifically
+  if (lowerQuery.includes('all')) {
+    if (lowerQuery.includes('single word') && lowerQuery.includes('palindrom')) {
+      filters.word_count = 1;
+      filters.is_palindrome = true;
+    }
   }
 
   // Validate that we parsed at least one filter
@@ -110,6 +129,15 @@ function parseNaturalLanguageQuery(query) {
     const error = new Error('Unable to parse natural language query. No valid filters found.');
     error.status = 400;
     throw error;
+  }
+
+  // Check for conflicting filters
+  if (filters.min_length !== undefined && filters.max_length !== undefined) {
+    if (filters.min_length > filters.max_length) {
+      const error = new Error('Conflicting filters: min_length cannot be greater than max_length');
+      error.status = 422;
+      throw error;
+    }
   }
 
   return filters;

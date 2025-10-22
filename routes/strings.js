@@ -26,6 +26,15 @@ router.post('/', async (req, res, next) => {
 router.get('/:value', async (req, res, next) => {
   try {
     const { value } = req.params;
+    
+    // Validate input
+    if (typeof value !== 'string') {
+      return res.status(400).json({
+        error: 'Bad Request',
+        message: 'Invalid string value'
+      });
+    }
+
     const analysis = await StringAnalysis.findByValue(value);
     res.json(analysis);
   } catch (error) {
@@ -79,6 +88,15 @@ router.get('/', async (req, res, next) => {
       filters.max_length = max;
     }
     
+    if (max_length !== undefined && min_length !== undefined) {
+      if (max_length < min_length) {
+        return res.status(400).json({
+          error: 'Bad Request',
+          message: 'max_length cannot be less than min_length'
+        });
+      }
+    }
+    
     if (word_count !== undefined) {
       const count = parseInt(word_count);
       if (isNaN(count) || count < 0) {
@@ -117,10 +135,10 @@ router.get('/filter-by-natural-language', async (req, res, next) => {
   try {
     const { query } = req.query;
 
-    if (!query) {
+    if (!query || typeof query !== 'string') {
       return res.status(400).json({
         error: 'Bad Request',
-        message: 'Query parameter is required'
+        message: 'Query parameter is required and must be a string'
       });
     }
 
@@ -136,6 +154,12 @@ router.get('/filter-by-natural-language', async (req, res, next) => {
       }
     });
   } catch (error) {
+    if (error.status === 400 || error.status === 422) {
+      return res.status(error.status).json({
+        error: error.status === 400 ? 'Bad Request' : 'Unprocessable Entity',
+        message: error.message
+      });
+    }
     next(error);
   }
 });
@@ -144,6 +168,14 @@ router.get('/filter-by-natural-language', async (req, res, next) => {
 router.delete('/:value', async (req, res, next) => {
   try {
     const { value } = req.params;
+    
+    if (typeof value !== 'string') {
+      return res.status(400).json({
+        error: 'Bad Request',
+        message: 'Invalid string value'
+      });
+    }
+
     await StringAnalysis.deleteByValue(value);
     res.status(204).send();
   } catch (error) {
