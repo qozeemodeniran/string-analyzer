@@ -1,0 +1,18 @@
+{
+  "name": "String Analyzer Service",
+  "description": "RESTful API for analyzing string properties",
+  "repository": "https://github.com/qozeemodeniran/string-analyzer.git",
+  "keywords": ["node", "express", "mysql", "api", "string-analysis"],
+  "env": {
+    "NODE_ENV": {
+      "description": "Environment setting",
+      "value": "production"
+    }
+  },
+  "addons": ["jawsdb-maria"],
+  "buildpacks": [
+    {
+      "url": "heroku/nodejs"
+    }
+  ]
+}
