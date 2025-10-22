@@ -1,34 +1,69 @@
 const mysql = require('mysql2/promise');
-require('dotenv').config();
 
-const dbConfig = {
-  host: process.env.JAWSDB_HOST || process.env.DB_HOST || 'localhost',
-  user: process.env.JAWSDB_USER || process.env.DB_USER || 'root',
-  password: process.env.JAWSDB_PASSWORD || process.env.DB_PASSWORD || '',
-  database: process.env.JAWSDB_DATABASE || process.env.DB_NAME || 'string_analyzer',
-  waitForConnections: true,
-  connectionLimit: 10,
-  queueLimit: 0
+const getDbConfig = () => {
+  // Check if JawsDB URL is available (Heroku)
+  if (process.env.JAWSDB_URL) {
+    const url = new URL(process.env.JAWSDB_URL);
+    return {
+      host: url.hostname,
+      user: url.username,
+      password: url.password,
+      database: url.pathname.substring(1),
+      port: url.port || 3306,
+      waitForConnections: true,
+      connectionLimit: 10,
+      queueLimit: 0,
+      ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+    };
+  }
+
+  // Fallback to environment variables or local development
+  return {
+    host: process.env.DB_HOST || 'localhost',
+    user: process.env.DB_USER || 'root',
+    password: process.env.DB_PASSWORD || '',
+    database: process.env.DB_NAME || 'string_analyzer',
+    port: process.env.DB_PORT || 3306,
+    waitForConnections: true,
+    connectionLimit: 10,
+    queueLimit: 0
+  };
 };
 
-// Create connection pool
+const dbConfig = getDbConfig();
 const pool = mysql.createPool(dbConfig);
+
+// Test database connection
+const testConnection = async () => {
+  try {
+    const connection = await pool.getConnection();
+    console.log('✅ Database connected successfully');
+    console.log(`📊 Database: ${dbConfig.database}`);
+    connection.release();
+    return true;
+  } catch (error) {
+    console.error('❌ Database connection failed:', error.message);
+    return false;
+  }
+};
 
 // Initialize database and table
 const initializeDatabase = async () => {
   try {
-    const connection = await mysql.createConnection({
-      host: dbConfig.host,
-      user: dbConfig.user,
-      password: dbConfig.password
-    });
+    // For JawsDB, we assume the database already exists
+    if (!process.env.JAWSDB_URL) {
+      // Only create database if not using JawsDB
+      const tempConnection = await mysql.createConnection({
+        host: dbConfig.host,
+        user: dbConfig.user,
+        password: dbConfig.password
+      });
 
-    // Create database if it doesn't exist
-    await connection.execute(
-      `CREATE DATABASE IF NOT EXISTS \`${dbConfig.database}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`
-    );
-    
-    await connection.end();
+      await tempConnection.execute(
+        `CREATE DATABASE IF NOT EXISTS \`${dbConfig.database}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`
+      );
+      await tempConnection.end();
+    }
 
     // Create table
     const createTableQuery = `
@@ -45,16 +80,21 @@ const initializeDatabase = async () => {
         INDEX idx_length (length),
         INDEX idx_is_palindrome (is_palindrome),
         INDEX idx_word_count (word_count),
-        INDEX idx_created_at (created_at)
-      )
+        INDEX idx_created_at (created_at),
+        INDEX idx_sha256_hash (sha256_hash),
+        FULLTEXT idx_value (value)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     `;
 
     await pool.execute(createTableQuery);
-    console.log('Database initialized successfully');
+    console.log('✅ Database table initialized successfully');
+    
+    // Test the connection
+    await testConnection();
   } catch (error) {
-    console.error('Database initialization failed:', error);
+    console.error('❌ Database initialization failed:', error);
     throw error;
   }
 };
 
-module.exports = { pool, initializeDatabase };
+module.exports = { pool, initializeDatabase, testConnection };
