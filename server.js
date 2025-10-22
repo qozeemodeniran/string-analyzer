@@ -1,99 +1,72 @@
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
+const { initializeDatabase } = require('./config/database');
 
-const { initializeDatabase, testConnection } = require('./config/database');
+// Import routes
 const stringRoutes = require('./routes/strings');
-const errorHandler = require('./middleware/errorHandler');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Middleware
+// Security middleware
 app.use(helmet());
 app.use(cors());
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true }));
 
-// Database initialization
-app.use(async (req, res, next) => {
-  try {
-    await initializeDatabase();
-    next();
-  } catch (error) {
-    console.error('Database initialization error:', error);
-    next(error);
-  }
+// Rate limiting
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100 // limit each IP to 100 requests per windowMs
 });
+app.use(limiter);
+
+// Body parsing middleware
+app.use(express.json({ limit: '10mb' }));
 
 // Routes
 app.use('/strings', stringRoutes);
 
-// Health check with database status
-app.get('/health', async (req, res) => {
-  const dbStatus = await testConnection();
+// Health check endpoint
+app.get('/health', (req, res) => {
   res.status(200).json({ 
     status: 'OK', 
-    database: dbStatus ? 'Connected' : 'Disconnected',
     timestamp: new Date().toISOString(),
-    service: 'String Analyzer API',
-    environment: process.env.NODE_ENV || 'development'
+    service: 'String Analyzer API'
   });
 });
-
-// Root endpoint
-app.get('/', (req, res) => {
-  res.json({
-    message: 'String Analyzer API',
-    version: '1.0.0',
-    status: 'Running',
-    endpoints: {
-      'POST /strings': 'Analyze and store a string',
-      'GET /strings/{value}': 'Get specific string analysis',
-      'GET /strings': 'Get all strings with filtering',
-      'GET /strings/filter-by-natural-language': 'Natural language filtering',
-      'DELETE /strings/{value}': 'Delete a string',
-      'GET /health': 'Health check'
-    }
-  });
-});
-
-// Error handling middleware
-app.use(errorHandler);
 
 // 404 handler
 app.use('*', (req, res) => {
   res.status(404).json({
     error: 'Endpoint not found',
-    message: `Route ${req.originalUrl} does not exist`
+    message: `The requested endpoint ${req.originalUrl} does not exist`
   });
 });
 
-// Start server
+// Global error handler
+app.use((error, req, res, next) => {
+  console.error('Global error handler:', error);
+  res.status(500).json({
+    error: 'Internal server error',
+    message: 'An unexpected error occurred'
+  });
+});
+
+// Initialize database and start server
 const startServer = async () => {
   try {
-    // Initialize database before starting server
     await initializeDatabase();
-    
     app.listen(PORT, () => {
-      console.log(`🚀 Server running on port ${PORT}`);
-      console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
-      console.log(`🔗 Health check: http://localhost:${PORT}/health`);
-      
-      // Log database connection info (without password)
-      if (process.env.JAWSDB_URL) {
-        const dbUrl = new URL(process.env.JAWSDB_URL);
-        console.log(`🗄️ Database: JawsDB (${dbUrl.hostname})`);
-      } else {
-        console.log(`🗄️ Database: ${process.env.DB_HOST || 'localhost'}`);
-      }
+      console.log(`String Analyzer API running on port ${PORT}`);
+      console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
     });
   } catch (error) {
-    console.error('❌ Failed to start server:', error);
+    console.error('Failed to start server:', error);
     process.exit(1);
   }
 };
 
 startServer();
 
-module.exports = app;
+module.exports = app; // For testing
