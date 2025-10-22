@@ -24,14 +24,28 @@ app.use(limiter);
 // Body parsing middleware
 app.use(express.json({ limit: '10mb' }));
 
-// Health check endpoint (without database dependency)
-app.get('/health', (req, res) => {
-  res.status(200).json({ 
-    status: 'OK', 
-    timestamp: new Date().toISOString(),
-    service: 'String Analyzer API',
-    database: 'Checking...'
-  });
+// Enhanced health check endpoint
+app.get('/health', async (req, res) => {
+  try {
+    const { pool } = require('./config/database');
+    const connection = await pool.getConnection();
+    connection.release();
+    
+    res.status(200).json({ 
+      status: 'OK', 
+      timestamp: new Date().toISOString(),
+      service: 'String Analyzer API',
+      database: 'Connected to JawsDB'
+    });
+  } catch (error) {
+    res.status(503).json({ 
+      status: 'ERROR', 
+      timestamp: new Date().toISOString(),
+      service: 'String Analyzer API',
+      database: 'Not connected',
+      error: error.message
+    });
+  }
 });
 
 // Routes
@@ -54,31 +68,26 @@ app.use((error, req, res, next) => {
   });
 });
 
-// Database connection state
-let isDatabaseConnected = false;
-
 const startServer = async () => {
   try {
-    console.log('Initializing database connection...');
-    console.log('Database URL:', process.env.JAWSDB_URL ? 'Set (hidden for security)' : 'Not set');
+    console.log('🚀 Starting String Analyzer Service...');
+    console.log('📊 Initializing JawsDB database connection...');
     
     await initializeDatabase();
-    isDatabaseConnected = true;
     
     app.listen(PORT, () => {
-      console.log(`String Analyzer API running on port ${PORT}`);
-      console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
-      console.log('Database: Connected and ready');
+      console.log(`✅ String Analyzer API running on port ${PORT}`);
+      console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
+      console.log(`🗄️  Database: JawsDB MySQL`);
+      console.log(`🔗 Health check: http://localhost:${PORT}/health`);
     });
   } catch (error) {
-    console.error('Failed to start server:', error);
-    console.log('Server starting without database connection...');
-    
-    // Start server even if database fails, but log the issue
-    app.listen(PORT, () => {
-      console.log(`String Analyzer API running on port ${PORT} (Database: Not connected)`);
-      console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
-    });
+    console.error('💥 Failed to start server:', error.message);
+    console.log('\n🔧 To fix this issue:');
+    console.log('1. For Heroku: Make sure JawsDB MySQL addon is installed');
+    console.log('2. For local development: Set JAWSDB_URL environment variable');
+    console.log('3. Get your JawsDB URL from: heroku config:get JAWSDB_URL');
+    process.exit(1);
   }
 };
 
@@ -87,4 +96,4 @@ if (process.env.NODE_ENV !== 'test') {
   startServer();
 }
 
-module.exports = { app, isDatabaseConnected }; // For testing
+module.exports = app;

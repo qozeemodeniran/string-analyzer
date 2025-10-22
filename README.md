@@ -2,40 +2,14 @@
 
 A RESTful API service that analyzes strings and stores their computed properties.
 
-## Features
-
-- Analyze strings and compute various properties
-- Store and retrieve string analyses
-- Filter strings by multiple criteria
-- Natural language query support
-- SHA256-based unique identification
-
-## API Endpoints
-
-### POST /strings
-Analyze a new string and store its properties.
-
-### GET /strings/{string_value}
-Retrieve analysis for a specific string.
-
-### GET /strings
-Get all strings with optional filtering.
-
-### GET /strings/filter-by-natural-language
-Filter strings using natural language queries.
-
-### DELETE /strings/{string_value}
-Delete a string from the system.
-
-## Local Development
+## 🚀 Quick Start
 
 ### Prerequisites
 - Node.js (v14 or higher)
-- MySQL database
+- JawsDB MySQL database (for all environments)
 
-### Installation
+### Local Development with JawsDB
 
-1. Clone the repository:
-```bash
-git clone <repository-url>
-cd string-analyzer-service
+1. **Get your JawsDB URL from Heroku:**
+   ```bash
+   heroku config:get JAWSDB_URL -a your-heroku-app-name

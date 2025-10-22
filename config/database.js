@@ -1,33 +1,22 @@
 const mysql = require('mysql2/promise');
 
-// Parse JawsDB URL or use individual environment variables
 const getDbConfig = () => {
-  // If JAWSDB_URL is available (Heroku), use that
-  if (process.env.JAWSDB_URL) {
-    const url = new URL(process.env.JAWSDB_URL);
-    return {
-      host: url.hostname,
-      user: url.username,
-      password: url.password,
-      database: url.pathname.substring(1), // Remove leading slash
-      port: url.port || 3306,
-      waitForConnections: true,
-      connectionLimit: 10,
-      queueLimit: 0,
-      ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
-    };
+  // Require JAWSDB_URL for all environments
+  if (!process.env.JAWSDB_URL) {
+    throw new Error('JAWSDB_URL environment variable is required. Please add JawsDB MySQL addon to your Heroku app.');
   }
-  
-  // Fallback to individual environment variables (for local development)
+
+  const url = new URL(process.env.JAWSDB_URL);
   return {
-    host: process.env.JAWSDB_HOST || 'localhost',
-    user: process.env.JAWSDB_USER || 'root',
-    password: process.env.JAWSDB_PASSWORD || '',
-    database: process.env.JAWSDB_DATABASE || 'string_analyzer',
-    port: process.env.JAWSDB_PORT || 3306,
+    host: url.hostname,
+    user: url.username,
+    password: url.password,
+    database: url.pathname.substring(1), // Remove leading slash
+    port: url.port || 3306,
     waitForConnections: true,
     connectionLimit: 10,
-    queueLimit: 0
+    queueLimit: 0,
+    ssl: { rejectUnauthorized: false } // Required for JawsDB
   };
 };
 
@@ -37,7 +26,7 @@ const initializeDatabase = async () => {
   let connection;
   try {
     connection = await pool.getConnection();
-    console.log('Connected to database successfully');
+    console.log('✅ Connected to JawsDB MySQL database successfully');
     
     // Create strings table
     await connection.execute(`
@@ -54,10 +43,10 @@ const initializeDatabase = async () => {
       )
     `);
     
-    console.log('Database initialized successfully');
+    console.log('✅ Database table initialized successfully');
     connection.release();
   } catch (error) {
-    console.error('Database initialization failed:', error);
+    console.error('❌ Database initialization failed:', error.message);
     if (connection) connection.release();
     throw error;
   }
