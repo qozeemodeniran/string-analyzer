@@ -3,6 +3,28 @@ const router = express.Router();
 const StringAnalyzer = require('../utils/stringAnalyzer');
 const { pool } = require('../config/database');
 
+// Database connection check middleware
+const checkDatabaseConnection = (req, res, next) => {
+  // For health check, always allow
+  if (req.path === '/health') return next();
+  
+  pool.getConnection()
+    .then(connection => {
+      connection.release();
+      next();
+    })
+    .catch(error => {
+      console.error('Database connection error:', error);
+      res.status(503).json({
+        error: 'Service Unavailable',
+        message: 'Database is not available. Please try again later.'
+      });
+    });
+};
+
+// Apply database connection check to all routes
+router.use(checkDatabaseConnection);
+
 // POST /strings - Create/Analyze String
 router.post('/', async (req, res) => {
   try {
@@ -64,6 +86,14 @@ router.post('/', async (req, res) => {
     res.status(201).json(analysis);
   } catch (error) {
     console.error('Error in POST /strings:', error);
+    
+    if (error.code === 'ER_DUP_ENTRY') {
+      return res.status(409).json({
+        error: 'Conflict',
+        message: 'String already exists in the system'
+      });
+    }
+    
     res.status(500).json({
       error: 'Internal Server Error',
       message: 'Failed to analyze string'

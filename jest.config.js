@@ -5,8 +5,13 @@ module.exports = {
     '**/*.js',
     '!**/node_modules/**',
     '!**/tests/**',
-    '!**/coverage/**'
+    '!**/coverage/**',
+    '!server.js'
   ],
   coverageDirectory: 'coverage',
-  verbose: true
+  verbose: true,
+  forceExit: true,
+  clearMocks: true,
+  resetMocks: true,
+  restoreMocks: true
 };

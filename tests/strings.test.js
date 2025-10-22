@@ -1,10 +1,12 @@
 const request = require('supertest');
 const app = require('../server');
-const { pool } = require('../config/database');
+const { pool, initializeDatabase } = require('../config/database');
 const StringAnalyzer = require('../utils/stringAnalyzer');
 
 describe('String Analyzer API', () => {
   beforeAll(async () => {
+    // Initialize database before tests
+    await initializeDatabase();
     // Clear the database before tests
     await pool.execute('DELETE FROM strings');
   });
@@ -164,7 +166,7 @@ describe('String Analyzer API', () => {
 
     it('should parse "palindromic strings" query', async () => {
       const response = await request(app)
-        .get('/strings/filter-by-natural-language?query=palindromic strings')
+        .get('/strings/filter-by-natural-language?query=palindromic%20strings')
         .expect(200);
 
       expect(response.body.interpreted_query.parsed_filters.is_palindrome).toBe(true);
@@ -172,7 +174,7 @@ describe('String Analyzer API', () => {
 
     it('should parse "strings longer than 5 characters" query', async () => {
       const response = await request(app)
-        .get('/strings/filter-by-natural-language?query=strings longer than 5 characters')
+        .get('/strings/filter-by-natural-language?query=strings%20longer%20than%205%20characters')
         .expect(200);
 
       expect(response.body.interpreted_query.parsed_filters.min_length).toBe(6);
@@ -180,7 +182,7 @@ describe('String Analyzer API', () => {
 
     it('should parse "single word strings" query', async () => {
       const response = await request(app)
-        .get('/strings/filter-by-natural-language?query=single word strings')
+        .get('/strings/filter-by-natural-language?query=single%20word%20strings')
         .expect(200);
 
       expect(response.body.interpreted_query.parsed_filters.word_count).toBe(1);
@@ -237,5 +239,23 @@ describe('StringAnalyzer Utility', () => {
     const hash = StringAnalyzer.generateSHA256('test');
     expect(hash).toHaveLength(64);
     expect(hash).toMatch(/^[a-f0-9]+$/);
+  });
+
+  test('should parse natural language queries correctly', () => {
+    expect(StringAnalyzer.parseNaturalLanguageQuery('palindromic strings')).toEqual({
+      is_palindrome: true
+    });
+
+    expect(StringAnalyzer.parseNaturalLanguageQuery('strings longer than 5 characters')).toEqual({
+      min_length: 6
+    });
+
+    expect(StringAnalyzer.parseNaturalLanguageQuery('single word strings')).toEqual({
+      word_count: 1
+    });
+
+    expect(StringAnalyzer.parseNaturalLanguageQuery('strings with letter a')).toEqual({
+      contains_character: 'a'
+    });
   });
 });

@@ -24,17 +24,18 @@ app.use(limiter);
 // Body parsing middleware
 app.use(express.json({ limit: '10mb' }));
 
-// Routes
-app.use('/strings', stringRoutes);
-
-// Health check endpoint
+// Health check endpoint (without database dependency)
 app.get('/health', (req, res) => {
   res.status(200).json({ 
     status: 'OK', 
     timestamp: new Date().toISOString(),
-    service: 'String Analyzer API'
+    service: 'String Analyzer API',
+    database: 'Checking...'
   });
 });
+
+// Routes
+app.use('/strings', stringRoutes);
 
 // 404 handler
 app.use('*', (req, res) => {
@@ -53,20 +54,37 @@ app.use((error, req, res, next) => {
   });
 });
 
-// Initialize database and start server
+// Database connection state
+let isDatabaseConnected = false;
+
 const startServer = async () => {
   try {
+    console.log('Initializing database connection...');
+    console.log('Database URL:', process.env.JAWSDB_URL ? 'Set (hidden for security)' : 'Not set');
+    
     await initializeDatabase();
+    isDatabaseConnected = true;
+    
     app.listen(PORT, () => {
       console.log(`String Analyzer API running on port ${PORT}`);
       console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+      console.log('Database: Connected and ready');
     });
   } catch (error) {
     console.error('Failed to start server:', error);
-    process.exit(1);
+    console.log('Server starting without database connection...');
+    
+    // Start server even if database fails, but log the issue
+    app.listen(PORT, () => {
+      console.log(`String Analyzer API running on port ${PORT} (Database: Not connected)`);
+      console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+    });
   }
 };
 
-startServer();
+// Only start server if not in test environment
+if (process.env.NODE_ENV !== 'test') {
+  startServer();
+}
 
-module.exports = app; // For testing
+module.exports = { app, isDatabaseConnected }; // For testing
